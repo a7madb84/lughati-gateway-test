@@ -3,94 +3,72 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>بوابة AR — تجربة الأسد</title>
+  <title>بوابة AR — الأسد</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Arial; margin: 24px; line-height: 1.7; }
-    .card { max-width: 560px; border: 1px solid #ddd; border-radius: 14px; padding: 18px; }
-    input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #ccc; margin: 10px 0; }
-    button { padding: 12px 14px; border-radius: 10px; border: 0; cursor: pointer; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .muted { color: #666; font-size: 14px; }
-    .hr { border-top: 1px dashed #ddd; margin: 14px 0; }
+    body{font-family:system-ui,-apple-system,Segoe UI,Arial;margin:24px;line-height:1.7}
+    .card{max-width:560px;border:1px solid #ddd;border-radius:14px;padding:18px}
+    input{width:100%;padding:12px;border-radius:10px;border:1px solid #ccc;margin:10px 0}
+    button{padding:12px 14px;border-radius:10px;border:0;cursor:pointer}
+    .muted{color:#666;font-size:14px}
   </style>
 </head>
 <body>
   <div class="card">
-    <h2>بوابة الواقع المعزز — حرف/أسد (اختبار)</h2>
+    <h2>بوابة الواقع المعزز — الأسد</h2>
     <p id="status" class="muted">جارٍ التحقق…</p>
 
-    <div class="row" style="margin: 12px 0;">
-      <button id="btnInfo">المعاينة (بدون AR)</button>
-      <button id="btnFull">فتح AR الكامل</button>
-    </div>
-
-    <div class="hr"></div>
-
-    <div id="unlockBox">
-      <label>أدخل كود التفعيل (اختبار)</label>
+    <div id="lockedBox" style="display:none;">
+      <p><strong>Standard Preview:</strong> هذه معاينة بدون AR. لإلغاء القفل أدخل كود التفعيل.</p>
       <input id="code" placeholder="LG-AR-TEST-1234" />
-      <button id="redeem">تفعيل الآن</button>
-      <p class="muted">
-        هذا اختبار تعليمي: الكود ثابت وموجود في الصفحة. في المسار 2 سننقل التحقق إلى Backend مجاني.
-      </p>
+      <button id="redeem">تفعيل وفتح AR</button>
     </div>
 
-    <div id="previewBox" style="display:none;">
-      <p><strong>معاينة Standard:</strong> هذه صفحة قفل لتوضيح الفكرة. لاحقًا يمكن أن تجعلها فيديو قصير/صور/شرح استخدام.</p>
+    <div id="unlockedBox" style="display:none;">
+      <p>✅ مفعل على هذا الجهاز.</p>
+      <button id="openFull">فتح AR الكامل</button>
     </div>
   </div>
 
 <script>
-  const FULL_URL = "https://mywebar.com/p/Project_1_cucz52qvqo?_ga=2.92380061.1013227403.1767454238-308669646.1767136465"; // عدّل هذا
+  const TOKEN_KEY = "LUGHATI_AR_TOKEN";
 
-  // كود اختبار ثابت (للتعلّم فقط)
-  const TEST_CODE = "LG-AR-TEST-1234";
+  async function resolve() {
+    const token = localStorage.getItem(TOKEN_KEY) || "";
+    const res = await fetch("/api/resolve", {
+      headers: token ? { "Authorization": "Bearer " + token } : {}
+    });
 
-  // تفعيل لمدة 30 يوم على نفس الجهاز
-  const KEY = "LUGHATI_AR_FULL_UNTIL";
-
-  function hasFullAccess() {
-    const until = Number(localStorage.getItem(KEY) || "0");
-    return Date.now() < until;
-  }
-  function grantFullAccess(days=30) {
-    const until = Date.now() + days*24*60*60*1000;
-    localStorage.setItem(KEY, String(until));
-  }
-  function go(url) { window.location.href = url; }
-
-  const status = document.getElementById("status");
-  const previewBox = document.getElementById("previewBox");
-
-  function render() {
-    if (hasFullAccess()) {
-      status.textContent = "✅ مفعل على هذا الجهاز: زر فتح AR الكامل سيعمل مباشرة.";
-    } else {
-      status.textContent = "🔒 غير مفعل: أدخل كود التفعيل لتجربة فتح AR الكامل.";
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById("unlockedBox").style.display = "block";
+      document.getElementById("lockedBox").style.display = "none";
+      document.getElementById("status").textContent = "✅ مفعل: سيتم فتح التجربة الكاملة.";
+      document.getElementById("openFull").onclick = () => window.location.href = data.url;
+      // افتح مباشرة:
+      window.location.href = data.url;
+      return;
     }
+
+    document.getElementById("lockedBox").style.display = "block";
+    document.getElementById("unlockedBox").style.display = "none";
+    document.getElementById("status").textContent = "🔒 غير مفعل: أدخل كود التفعيل.";
   }
 
-  document.getElementById("btnInfo").onclick = () => {
-    previewBox.style.display = (previewBox.style.display === "none") ? "block" : "none";
+  document.getElementById("redeem").onclick = async () => {
+    const code = (document.getElementById("code").value || "").trim();
+    const res = await fetch("/api/redeem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok || !data.token) return alert("الكود غير صحيح.");
+
+    localStorage.setItem(TOKEN_KEY, data.token);
+    resolve();
   };
 
-  document.getElementById("btnFull").onclick = () => {
-    if (!hasFullAccess()) return alert("غير مفعل. أدخل كود التفعيل أولاً.");
-    go(FULL_URL);
-  };
-
-  document.getElementById("redeem").onclick = () => {
-    const c = (document.getElementById("code").value || "").trim();
-    if (c === TEST_CODE) {
-      grantFullAccess(30);
-      render();
-      go(FULL_URL);
-    } else {
-      alert("الكود غير صحيح.");
-    }
-  };
-
-  render();
+  resolve();
 </script>
 </body>
 </html>
